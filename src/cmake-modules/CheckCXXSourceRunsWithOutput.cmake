@@ -25,6 +25,9 @@
 # (To distribute this file outside of CMake, substitute the full
 #  License text for the above reference.)
 
+IF(POLICY CMP0054)
+  cmake_policy(SET CMP0054 OLD)
+ENDIF()
 INCLUDE(CMakeExpandImportedTargets)
 
 

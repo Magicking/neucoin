@@ -126,6 +126,9 @@ if(TEST)
            WORKING_DIRECTORY ${SOURCE_DIR})
 endif()
 
+add_custom_target(GENERATE_VERSION ALL
+                  COMMAND "${SOURCE_DIR}/../contrib/build-versioning/generate-build-version.sh" build.h
+                  WORKING_DIRECTORY ${SOURCE_DIR})
 add_executable(neucoind ${NEUCOIND_SRCS})
 target_link_libraries(neucoind ${NEUCOIND_LIBS})
 
