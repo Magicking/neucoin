@@ -397,6 +397,22 @@ string FormatMoney(int64 n, bool fPlus)
 }
 
 
+int64 DecimalToint64(int64 n, uint64 d, uint64 p)
+{
+    while (p > COIN_PRECISION)
+    {
+        d /= 10;
+        p--;
+    }
+    for (int i = p - COIN_PRECISION; i > 0; i--)
+        d *= 10;
+    for (int i = COIN_PRECISION; i > 0; i--)
+        n *= 10;
+
+    return d + static_cast<int64>(n);
+}
+
+
 bool ParseMoney(const string& str, int64& nRet)
 {
     return ParseMoney(str.c_str(), nRet);

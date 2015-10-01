@@ -96,10 +96,13 @@ double GetDifficulty(const CBlockIndex* blockindex = NULL)
 
 int64 AmountFromValue(const Value& value)
 {
-    double dAmount = value.get_real();
-    if (dAmount <= 0.0 || dAmount > MAX_MONEY_STACK)
+    Decimal dAmount = value.get_decimal();
+    int64   nAmount = DecimalToint64(dAmount.get_integer(),
+                                     dAmount.get_fractional(),
+                                     dAmount.get_precision());
+
+    if (nAmount <= 0 || nAmount > MAX_MONEY_STACK)
         throw JSONRPCError(-3, "Invalid amount");
-    int64 nAmount = roundint64(dAmount * COIN);
     if (!IsValidAmount(nAmount))
         throw JSONRPCError(-3, "Invalid amount");
     return nAmount;
@@ -107,7 +110,11 @@ int64 AmountFromValue(const Value& value)
 
 Value ValueFromAmount(int64 amount)
 {
-    return (double)amount / (double)COIN;
+    int64 n_abs     = (amount > 0 ? amount : -amount);
+    int64 quotient  = n_abs / COIN;
+    int64 remainder = n_abs % COIN;
+
+    return Decimal(quotient, static_cast<uint64>(remainder), COIN_PRECISION);
 }
 
 std::string

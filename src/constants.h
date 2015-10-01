@@ -22,6 +22,7 @@
 #define COIN_UNIT_NAME_M "Milli-" COIN_UNIT
 #define COIN_UNIT_NAME_U "Micro-" COIN_UNIT
 
+#define COIN_PRECISION   6
 #define COIN_BUGTRACKER  "http://github.com/neucoin/neucoind/issues"
 
 extern uint16_t                          COIN_PORT;
