@@ -14,6 +14,8 @@
 #include <boost/bind.hpp>
 #include <boost/function.hpp>
 #include <boost/version.hpp>
+#include <boost/lexical_cast.hpp>
+#include <boost/algorithm/string.hpp>
 
 #if BOOST_VERSION >= 103800
     #include <boost/spirit/include/classic_core.hpp>
@@ -280,6 +282,27 @@ namespace json_spirit
             add_to_current( ui );
         }
 
+        void new_decimal( Iter_type begin, Iter_type end )
+        {
+            String_type str(begin, end);
+            std::vector< String_type > str_split;
+            boost::int64_t  integer;
+            boost::uint64_t fractional = 0;
+            boost::uint8_t  precision  = 0;
+
+            if (str[0] == '.')
+                str.insert(0, "0");
+            boost::split(str_split, str, boost::is_any_of("."));
+            integer       = boost::lexical_cast<boost::int64_t >(str_split[0]);
+            if (str_split.size() > 1)
+            {
+                fractional = boost::lexical_cast<boost::uint64_t>(str_split[1]);
+                precision  = static_cast<boost::uint8_t>(str_split[1].size());
+            }
+
+            add_to_current( Decimal_type(integer, fractional, precision) );
+        }
+
         void new_real( double d )
         {
             add_to_current( d );
@@ -424,22 +447,24 @@ namespace json_spirit
 
                 typedef boost::function< void( Char_type )            > Char_action;
                 typedef boost::function< void( Iter_type, Iter_type ) > Str_action;
+                typedef boost::function< void( Iter_type, Iter_type ) > Decimal_action;
                 typedef boost::function< void( double )               > Real_action;
                 typedef boost::function< void( boost::int64_t )       > Int_action;
                 typedef boost::function< void( boost::uint64_t )      > Uint64_action;
 
-                Char_action   begin_obj  ( boost::bind( &Semantic_actions_t::begin_obj,   &self.actions_, _1 ) );
-                Char_action   end_obj    ( boost::bind( &Semantic_actions_t::end_obj,     &self.actions_, _1 ) );
-                Char_action   begin_array( boost::bind( &Semantic_actions_t::begin_array, &self.actions_, _1 ) );
-                Char_action   end_array  ( boost::bind( &Semantic_actions_t::end_array,   &self.actions_, _1 ) );
-                Str_action    new_name   ( boost::bind( &Semantic_actions_t::new_name,    &self.actions_, _1, _2 ) );
-                Str_action    new_str    ( boost::bind( &Semantic_actions_t::new_str,     &self.actions_, _1, _2 ) );
-                Str_action    new_true   ( boost::bind( &Semantic_actions_t::new_true,    &self.actions_, _1, _2 ) );
-                Str_action    new_false  ( boost::bind( &Semantic_actions_t::new_false,   &self.actions_, _1, _2 ) );
-                Str_action    new_null   ( boost::bind( &Semantic_actions_t::new_null,    &self.actions_, _1, _2 ) );
-                Real_action   new_real   ( boost::bind( &Semantic_actions_t::new_real,    &self.actions_, _1 ) );
-                Int_action    new_int    ( boost::bind( &Semantic_actions_t::new_int,     &self.actions_, _1 ) );
-                Uint64_action new_uint64 ( boost::bind( &Semantic_actions_t::new_uint64,  &self.actions_, _1 ) );
+                Char_action    begin_obj   ( boost::bind( &Semantic_actions_t::begin_obj,   &self.actions_, _1 ) );
+                Char_action    end_obj     ( boost::bind( &Semantic_actions_t::end_obj,     &self.actions_, _1 ) );
+                Char_action    begin_array ( boost::bind( &Semantic_actions_t::begin_array, &self.actions_, _1 ) );
+                Char_action    end_array   ( boost::bind( &Semantic_actions_t::end_array,   &self.actions_, _1 ) );
+                Str_action     new_name    ( boost::bind( &Semantic_actions_t::new_name,    &self.actions_, _1, _2 ) );
+                Str_action     new_str     ( boost::bind( &Semantic_actions_t::new_str,     &self.actions_, _1, _2 ) );
+                Str_action     new_true    ( boost::bind( &Semantic_actions_t::new_true,    &self.actions_, _1, _2 ) );
+                Str_action     new_false   ( boost::bind( &Semantic_actions_t::new_false,   &self.actions_, _1, _2 ) );
+                Str_action     new_null    ( boost::bind( &Semantic_actions_t::new_null,    &self.actions_, _1, _2 ) );
+                Decimal_action new_decimal ( boost::bind( &Semantic_actions_t::new_decimal, &self.actions_, _1, _2 ) );
+                Real_action    new_real    ( boost::bind( &Semantic_actions_t::new_real,    &self.actions_, _1 ) );
+                Int_action     new_int     ( boost::bind( &Semantic_actions_t::new_int,     &self.actions_, _1 ) );
+                Uint64_action  new_uint64  ( boost::bind( &Semantic_actions_t::new_uint64,  &self.actions_, _1 ) );
 
                 // actual grammer
 
@@ -495,14 +520,19 @@ namespace json_spirit
                       ]
                     ;
 
+                decimal_
+                    = int64_p >> ch_p(".") >> uint64_p
+                    | ch_p(".") >> uint64_p;
+
                 number_
-                    = strict_real_p[ new_real   ] 
-                    | int64_p      [ new_int    ]
-                    | uint64_p     [ new_uint64 ]
+                    = decimal_      [ new_decimal ]
+                    | strict_real_p [ new_real    ]
+                    | int64_p       [ new_int     ]
+                    | uint64_p      [ new_uint64  ]
                     ;
             }
 
-            spirit_namespace::rule< ScannerT > json_, object_, members_, pair_, array_, elements_, value_, string_, number_;
+            spirit_namespace::rule< ScannerT > json_, object_, members_, pair_, array_, elements_, value_, string_, decimal_, number_;
 
             const spirit_namespace::rule< ScannerT >& start() const { return json_; }
         };

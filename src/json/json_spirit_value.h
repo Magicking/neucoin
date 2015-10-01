@@ -20,11 +20,39 @@
 #include <boost/cstdint.hpp> 
 #include <boost/shared_ptr.hpp> 
 #include <boost/variant.hpp> 
+#include <cmath>
+
+#define JSON_SPIRIT_PRECISION 8
 
 namespace json_spirit
 {
-    enum Value_type{ obj_type, array_type, str_type, bool_type, int_type, real_type, null_type };
-    static const char* Value_type_name[]={"obj", "array", "str", "bool", "int", "real", "null"};
+    enum Value_type{ obj_type, array_type, str_type, bool_type, int_type, real_type, decimal_type, null_type };
+    static const char* Value_type_name[]={"obj", "array", "str", "bool", "int", "real", "decimal", "null"};
+
+
+    // decimal type
+
+    typedef struct Decimal_type
+    {
+            Decimal_type(boost::int64_t _integer, boost::uint64_t _fractional, boost::uint8_t _precision):
+                         integer(_integer), fractional(_fractional), precision(_precision) {};
+            bool operator==( const Decimal_type& lhs ) const
+            {
+              return this->fractional == lhs.fractional &&
+                     this->precision  == lhs.precision  &&
+                     this->integer    == lhs.integer;
+            };
+            boost::int64_t  get_integer()    const { return this->integer;    }
+            boost::uint64_t get_fractional() const { return this->fractional; }
+            boost::uint8_t  get_precision()  const { return this->precision;  }
+
+        private:
+            boost::int64_t  integer;
+            boost::uint64_t fractional;
+            boost::uint8_t  precision;
+    } Decimal_type;
+
+    typedef Decimal_type Decimal;
 
     template< class Config >    // Config determines whether the value uses std::string or std::wstring and
                                 // whether JSON Objects are represented as vectors or maps
@@ -37,17 +65,19 @@ namespace json_spirit
         typedef typename Config::Object_type Object;
         typedef typename Config::Array_type Array;
         typedef typename String_type::const_pointer Const_str_ptr;  // eg const char*
+        typedef struct Decimal_type Decimal;
 
         Value_impl();  // creates null value
-        Value_impl( Const_str_ptr      value ); 
-        Value_impl( const String_type& value );
-        Value_impl( const Object&      value );
-        Value_impl( const Array&       value );
-        Value_impl( bool               value );
-        Value_impl( int                value );
-        Value_impl( boost::int64_t     value );
-        Value_impl( boost::uint64_t    value );
-        Value_impl( double             value );
+        Value_impl( Const_str_ptr       value );
+        Value_impl( const String_type&  value );
+        Value_impl( const Object&       value );
+        Value_impl( const Array&        value );
+        Value_impl( bool                value );
+        Value_impl( int                 value );
+        Value_impl( boost::int64_t      value );
+        Value_impl( boost::uint64_t     value );
+        Value_impl( double              value );
+        Value_impl( const Decimal_type& value );
 
         Value_impl( const Value_impl& other );
 
@@ -60,14 +90,15 @@ namespace json_spirit
         bool is_uint64() const;
         bool is_null() const;
 
-        const String_type& get_str()    const;
-        const Object&      get_obj()    const;
-        const Array&       get_array()  const;
-        bool               get_bool()   const;
-        int                get_int()    const;
-        boost::int64_t     get_int64()  const;
-        boost::uint64_t    get_uint64() const;
-        double             get_real()   const;
+        const String_type&  get_str()     const;
+        const Object&       get_obj()     const;
+        const Array&        get_array()   const;
+        bool                get_bool()    const;
+        int                 get_int()     const;
+        boost::int64_t      get_int64()   const;
+        boost::uint64_t     get_uint64()  const;
+        double              get_real()    const;
+        Decimal_type        get_decimal() const;
 
         Object& get_obj();
         Array&  get_array();
@@ -83,13 +114,12 @@ namespace json_spirit
 
         typedef boost::variant< String_type, 
                                 boost::recursive_wrapper< Object >, boost::recursive_wrapper< Array >, 
-                                bool, boost::int64_t, double > Variant;
+                                bool, boost::int64_t, double, Decimal_type > Variant;
 
         Value_type type_;
         Variant v_;
         bool is_uint64_;
     };
-
     // vector objects
 
     template< class Config >
@@ -288,6 +318,14 @@ namespace json_spirit
     }
 
     template< class Config >
+    Value_impl< Config >::Value_impl( const Decimal_type& value )
+    :   type_( decimal_type )
+    ,   v_( value )
+    ,   is_uint64_( false )
+    {
+    }
+
+    template< class Config >
     Value_impl< Config >::Value_impl( const Value_impl< Config >& other )
     :   type_( other.type() )
     ,   v_( other.v_ )
@@ -413,10 +451,49 @@ namespace json_spirit
             return is_uint64() ? static_cast< double >( get_uint64() )
                                : static_cast< double >( get_int64() );
         }
+        else if( type() == decimal_type )
+        {
+            double ret;
+            Decimal_type d = get_decimal();
+
+            ret  = static_cast< double >(d.get_fractional());
+            ret /= std::pow(10.0, static_cast< int >(d.get_precision()));
+            ret += static_cast< double >(d.get_integer());
+
+            return ret;
+        }
 
         check_type(  real_type );
 
         return boost::get< double >( v_ );
+    }
+
+    template< class Config >
+    Decimal_type Value_impl< Config >::get_decimal() const
+    {
+        if( type() == int_type )
+        {
+            return is_uint64() ? Decimal_type(static_cast< double >(get_uint64()), 0, 0)
+                               : Decimal_type(get_int64(), 0, 0);
+        }
+        else if( type() == real_type )
+        {
+            int64  n;
+            uint64 d;
+
+            double r = get_real();
+            uint64 p = static_cast< uint64 >(std::pow(10.0, JSON_SPIRIT_PRECISION));
+
+            n = static_cast< int64 >(r);
+            r = (r > 0) ? r : -r;
+            d = static_cast< uint64 >(r * p) % p;
+
+            return Decimal_type(n, d, JSON_SPIRIT_PRECISION);
+        }
+
+        check_type(  decimal_type );
+
+        return *boost::get< Decimal_type >( &v_ );
     }
 
     template< class Config >
@@ -496,6 +573,12 @@ namespace json_spirit
         double get_value( const Value& value, Type_to_type< double > )
         {
             return value.get_real();
+        }
+       
+        template< class Value > 
+        typename Value::Decimal_type get_value( const Value& value, Type_to_type< typename Value::Decimal > )
+        {
+            return value.get_decimal();
         }
        
         template< class Value > 

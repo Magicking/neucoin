@@ -119,17 +119,18 @@ namespace json_spirit
         {
             switch( value.type() )
             {
-                case obj_type:   output( value.get_obj() );   break;
-                case array_type: output( value.get_array() ); break;
-                case str_type:   output( value.get_str() );   break;
-                case bool_type:  output( value.get_bool() );  break;
-                case int_type:   output_int( value );         break;
+                case obj_type:     output( value.get_obj() );     break;
+                case array_type:   output( value.get_array() );   break;
+                case str_type:     output( value.get_str() );     break;
+                case bool_type:    output( value.get_bool() );    break;
+                case int_type:     output_int( value );           break;
 
                 /// Bitcoin: Added std::fixed and changed precision from 16 to 8
-                case real_type:  os_ << std::showpoint << std::fixed << std::setprecision(8)
-                                     << value.get_real();     break;
+                case real_type:    os_ << std::showpoint << std::fixed << std::setprecision(JSON_SPIRIT_PRECISION)
+                                     << value.get_real();         break;
 
-                case null_type:  os_ << "null";               break;
+                case decimal_type: output( value.get_decimal() ); break;
+                case null_type:    os_ << "null";                 break;
                 default: assert( false );
             }
         }
@@ -171,6 +172,21 @@ namespace json_spirit
         void output( bool b )
         {
             os_ << to_str< String_type >( b ? "true" : "false" );
+        }
+
+        void output( const Decimal_type& d )
+        {
+            char fractional_part[20];
+            boost::uint8_t log10;
+
+            log10 = static_cast<boost::uint8_t>(snprintf(fractional_part, 19, "%llu", d.get_fractional()));
+
+            os_ << d.get_integer() << '.';
+
+            if (log10 < d.get_precision())
+                for (boost::uint8_t i = d.get_precision() - log10; i > 0; i--)
+                    os_ << '0';
+            os_ << d.get_fractional();
         }
 
         template< class T >
