@@ -34,6 +34,7 @@ ui_*.h
 /src/.make.cxxflags
 /src/.make.ldflags
 
+/neucoind
 /src/neucoind
 /src/neucoin-qt
 
@@ -44,3 +45,11 @@ ui_*.h
 /src/neucoin-qt.dmg
 
 /share/pixmaps
+
+CMakeCache.txt
+CMakeFiles
+Makefile
+cmake_install.cmake
+CTestTestfile.cmake
+Testing/
+src/neucoin_test
