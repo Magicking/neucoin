@@ -14,21 +14,21 @@ if(DB_LIBRARY AND DB_INCLUDE_DIR)
   endif()
   set(CMAKE_REQUIRED_INCLUDES  ${DB_INCLUDE_DIR})
   set(CMAKE_REQUIRED_LIBRARIES ${DB_LIBRARY})
+  include(CheckCXXSourceRunsWithOutput)
 
-  include(CheckCXXSourceRuns)
-
-  CHECK_CXX_SOURCE_RUNS("
+  CHECK_CXX_SOURCE_RUNS_WITH_OUTPUT("
   #include <iostream>
   #include <db_cxx.h>
   int main()
   {
   int major, minor;
   DbEnv::version(&major, &minor, NULL);
-  return !(major == 5 && minor == 3);
+  std::cout << major << \".\" << minor;
+  return 0;
   }"
-  DB_VERSION_5_3)
-  if(DB_VERSION_5_3)
-    set(DB_VERSION "5.3")
+  libdb_version LIBDB_RESULT)
+  if(libdb_version)
+    set(DB_VERSION "${LIBDB_RESULT}")
   endif()
 endif()
 

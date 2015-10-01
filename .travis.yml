@@ -7,7 +7,7 @@ before_install:
     # Client dependencies
     - sudo add-apt-repository --yes ppa:ubuntu-sdk-team/ppa && sudo apt-get update -qq # Travis actually requires to manual add this apt repository (not required in Ubuntu 14.04)
     - sudo apt-key update # Maintainers keys might change
-    - sudo apt-get install -qq g++ make libboost-system-dev libboost-filesystem-dev libboost-program-options-dev libboost-thread-dev libdb++-dev libssl-dev libqrencode-dev libpng-dev qt5-default pkg-config
+    - sudo apt-get install -qq g++ make libboost-system-dev libboost-filesystem-dev libboost-program-options-dev libboost-thread-dev libboost-test-dev libdb++-dev libssl-dev libqrencode-dev libpng-dev qt5-default pkg-config cmake
 
     # Tests dependencies
     - sudo apt-get install -qq nodejs npm
@@ -20,8 +20,12 @@ install:
 
 script:
 
-    - cd ../src
-    - make -f Makefile.unix TESTING=1 neucoind
+    - cd ..
+    - cmake -D TEST=true -D DISABLE_LIBDB_CHECK=true -D ENABLE_UPNP=false src
+    - make
+
+    - cd src
+    - ./neucoin_test
 
     - cd ../test
     - bash run-all.sh

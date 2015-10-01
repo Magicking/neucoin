@@ -1,14 +1,18 @@
-cmake_minimum_required(VERSION 3.2.2)
+cmake_minimum_required(VERSION 2.8.0)
 project(neucoin C CXX)
 
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake-modules)
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake-modules")
 if(TEST)
   enable_testing()
   find_package(Boost REQUIRED COMPONENTS unit_test_framework)
   add_definitions("-DBOOST_TEST_DYN_LINK")
 endif()
 find_package(Boost REQUIRED COMPONENTS system filesystem program_options thread)
-find_package(libdb 5.3 EXACT REQUIRED)
+if(DISABLE_LIBDB_CHECK)
+  find_package(libdb REQUIRED)
+else()
+  find_package(libdb 5.3 EXACT REQUIRED)
+endif()
 find_package(OpenSSL REQUIRED)
 find_package(Threads REQUIRED)
 
@@ -39,11 +43,11 @@ if(ENABLE_UPNP)
         CACHE BOOL "UPnP support" FORCE)
   else()
     add_definitions("-DUSE_UPNP")
-    list(APPEND NEUCOIND_LIBS "-lminiupnpc")
+    set(NEUCOIND_LIBS "${NEUCOIND_LIBS} -lminiupnpc")
   endif()
 endif()
 
-set(CMAKE_EXE_LINKER_FLAGS "${BASE_LIBS}")
+set(NEUCOIND_LIBS ${NEUCOIND_LIBS} ${BASE_LIBS})
 set(SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(SOURCE_TEST_DIR "${SOURCE_DIR}/test")
 
@@ -115,10 +119,10 @@ if(TEST)
   add_executable(neucoin_test ${NEUCOIN_TESTS_SRCS_FINAL})
   set_target_properties(neucoin_test PROPERTIES
               RUNTIME_OUTPUT_DIRECTORY ${SOURCE_DIR})
-  target_link_libraries(neucoin_test ${NEUCOIND_LIBS} ${OPT_LIBS}
+  target_link_libraries(neucoin_test ${NEUCOIND_LIBS}
                                      "-lboost_unit_test_framework")
   add_test(NAME neucoin_test
-           COMMAND ${SOURCE_DIR}/neucoin_test
+           COMMAND "${SOURCE_DIR}/neucoin_test"
            WORKING_DIRECTORY ${SOURCE_DIR})
 endif()
 
