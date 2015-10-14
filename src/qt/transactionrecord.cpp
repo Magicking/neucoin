@@ -70,7 +70,7 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
                 }
                 else if (ExtractDestination(txout.scriptPubKey, address))
                 {
-                    if (IsMine(*wallet, address))
+                    if (IsMine(*wallet, address) & ISMINE_SPENDABLE)
                     {
                         // Received by Bitcoin Address
                         sub.type = TransactionRecord::RecvWithAddress;
@@ -93,11 +93,11 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
         {
             bool fAllFromMe = true;
             BOOST_FOREACH(const CTxIn& txin, wtx.vin)
-                fAllFromMe = fAllFromMe && wallet->IsMine(txin);
+                fAllFromMe = fAllFromMe && (wallet->IsMine(txin) & ISMINE_SPENDABLE);
 
             bool fAllToMe = true;
             BOOST_FOREACH(const CTxOut& txout, wtx.vout)
-                fAllToMe = fAllToMe && wallet->IsMine(txout);
+                fAllToMe = fAllToMe && (wallet->IsMine(txout) & ISMINE_SPENDABLE);
 
             if (fAllFromMe && fAllToMe)
             {
@@ -120,7 +120,7 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
                     TransactionRecord sub(hash, nTime);
                     sub.idx = parts.size();
 
-                    if(wallet->IsMine(txout))
+                    if(wallet->IsMine(txout) & ISMINE_SPENDABLE)
                     {
                         // Ignore parts sent to self, as this is usually the change
                         // from a transaction sent back to our own address.

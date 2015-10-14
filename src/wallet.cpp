@@ -9,6 +9,7 @@
 #include "StakeStats.h"
 #include "main.h"
 #include "wallet.h"
+#include "wallet_ismine.h"
 #include "walletdb.h"
 #include "crypter.h"
 #include "ui_interface.h"
@@ -308,7 +309,7 @@ void CWallet::WalletUpdateSpent(const CTransaction &tx)
             if (mi != mapWallet.end())
             {
                 CWalletTx& wtx = (*mi).second;
-                if (!wtx.IsSpent(txin.prevout.n) && (IsMine(wtx.vout[txin.prevout.n]) || IsMineForMintingOnly(wtx.vout[txin.prevout.n])))
+                if (!wtx.IsSpent(txin.prevout.n) && ((IsMine(wtx.vout[txin.prevout.n]) & ISMINE_SPENDABLE) || IsMineForMintingOnly(wtx.vout[txin.prevout.n])))
                 {
                     printf("WalletUpdateSpent found spent coin %s" COIN_UNIT " %s\n", FormatMoney(wtx.GetCredit()).c_str(), wtx.GetHash().ToString().c_str());
                     wtx.MarkSpent(txin.prevout.n);
@@ -420,7 +421,8 @@ bool CWallet::AddToWalletIfInvolvingMe(const CTransaction& tx, const CBlock* pbl
         LOCK(cs_wallet);
         bool fExisted = mapWallet.count(hash);
         if (fExisted && !fUpdate) return false;
-        if (fExisted || IsMine(tx) || IsFromMe(tx) || IsMineForMintingOnly(tx))
+        isminetype mine = IsMine(tx, ISMINE_ALL_SCRIPT);
+        if (fExisted || mine != ISMINE_NO)
         {
             CWalletTx wtx(this,tx);
             // Get merkle branch if transaction was found in a block
@@ -447,7 +449,7 @@ bool CWallet::EraseFromWallet(uint256 hash)
 }
 
 
-bool CWallet::IsMine(const CTxIn &txin) const
+isminetype CWallet::IsMine(const CTxIn &txin) const
 {
     {
         LOCK(cs_wallet);
@@ -456,11 +458,14 @@ bool CWallet::IsMine(const CTxIn &txin) const
         {
             const CWalletTx& prev = (*mi).second;
             if (txin.prevout.n < prev.vout.size())
-                if (IsMine(prev.vout[txin.prevout.n]))
-                    return true;
+            {
+                isminetype ret = IsMine(prev.vout[txin.prevout.n]);
+                if (ret != ISMINE_NO)
+                    return ret;
+            }
         }
     }
-    return false;
+    return ISMINE_NO;
 }
 
 int64 CWallet::GetDebit(const CTxIn &txin) const
@@ -472,7 +477,7 @@ int64 CWallet::GetDebit(const CTxIn &txin) const
         {
             const CWalletTx& prev = (*mi).second;
             if (txin.prevout.n < prev.vout.size())
-                if (IsMine(prev.vout[txin.prevout.n]))
+                if (IsMine(prev.vout[txin.prevout.n]) & ISMINE_SPENDABLE)
                     return prev.vout[txin.prevout.n].nValue;
         }
     }
@@ -490,7 +495,7 @@ bool CWallet::IsChange(const CTxOut& txout) const
     // a better way of identifying which outputs are 'the send' and which are
     // 'the change' will need to be implemented (maybe extend CWalletTx to remember
     // which output, if any, was change).
-    if (ExtractDestination(txout.scriptPubKey, address) && ::IsMine(*this, address))
+    if (ExtractDestination(txout.scriptPubKey, address) && (::IsMine(*this, txout.scriptPubKey) & ISMINE_SPENDABLE))
     {
         LOCK(cs_wallet);
         if (!mapAddressBook.count(address))
@@ -586,7 +591,7 @@ void CWalletTx::GetAmounts(int64& nGeneratedImmature, int64& nGeneratedMature, l
         if (nDebit > 0)
             listSent.push_back(make_pair(address, txout.nValue));
 
-        if (pwallet->IsMine(txout))
+        if (pwallet->IsMine(txout) & ISMINE_SPENDABLE)
             listReceived.push_back(make_pair(address, txout.nValue));
     }
 
@@ -898,9 +903,7 @@ int64 CWallet::GetMintingOnlyBalance() const
             const CWalletTx* pcoin = &(*it).second;
 
             if (pcoin->IsConfirmed())
-            {
                 nTotal += pcoin->GetAvailableCreditForMintingOnly();
-            }
         }
     }
 
@@ -954,7 +957,7 @@ int64 CWallet::GetNewMint() const
 }
 
 // populate vCoins with vector of spendable (age, (value, (transaction, output_number))) outputs
-void CWallet::AvailableCoins(unsigned int nSpendTime, vector<COutput>& vCoins, bool fOnlyConfirmed, bool fMintingOnly) const
+void CWallet::AvailableCoins(unsigned int nSpendTime, isminefilter filter, vector<COutput>& vCoins, bool fOnlyConfirmed, bool fMintingOnly) const
 {
     vCoins.clear();
 
@@ -982,7 +985,7 @@ void CWallet::AvailableCoins(unsigned int nSpendTime, vector<COutput>& vCoins, b
                 if (pcoin->IsSpent(i))
                     continue ;
 
-                if (fMintingOnly ? !IsMineForMintingOnly(pcoin->vout[i]) : !IsMine(pcoin->vout[i]))
+                if (fMintingOnly ? !IsMineForMintingOnly(pcoin->vout[i]) : !(IsMine(pcoin->vout[i]) & filter))
                     continue ;
 
                 if (pcoin->vout[i].nValue <= 0)
@@ -997,7 +1000,7 @@ void CWallet::AvailableCoins(unsigned int nSpendTime, vector<COutput>& vCoins, b
 bool CWallet::SelectMintingOnlyCoins(unsigned int nSpendTime, std::set<std::pair<const CWalletTx*, unsigned int> >& setCoinsRet, int64& nValueRet) const
 {
     std::vector<COutput> vCoins;
-    AvailableCoins(nSpendTime, vCoins, true, true);
+    AvailableCoins(nSpendTime, ISMINE_NO, vCoins, true, true);
 
     setCoinsRet.clear();
     nValueRet = 0;
@@ -1144,10 +1147,10 @@ bool CWallet::SelectCoinsMinConf(int64 nTargetValue, int nConfMine, int nConfThe
     return true;
 }
 
-bool CWallet::SelectCoins(int64 nTargetValue, unsigned int nSpendTime, set<pair<const CWalletTx*,unsigned int> >& setCoinsRet, int64& nValueRet) const
+bool CWallet::SelectCoins(int64 nTargetValue, unsigned int nSpendTime, isminefilter filter, set<pair<const CWalletTx*,unsigned int> >& setCoinsRet, int64& nValueRet) const
 {
     vector<COutput> vCoins;
-    AvailableCoins(nSpendTime, vCoins);
+    AvailableCoins(nSpendTime, filter, vCoins);
 
     return (SelectCoinsMinConf(nTargetValue, 1, 6, vCoins, setCoinsRet, nValueRet) ||
             SelectCoinsMinConf(nTargetValue, 1, 1, vCoins, setCoinsRet, nValueRet) ||
@@ -1193,7 +1196,7 @@ bool CWallet::CreateTransaction(const vector<pair<CScript, int64> >& vecSend, CW
                 // Choose coins to use
                 set<pair<const CWalletTx*,unsigned int> > setCoins;
                 int64 nValueIn = 0;
-                if (!SelectCoins(nTotalValue, wtxNew.nTime, setCoins, nValueIn))
+                if (!SelectCoins(nTotalValue, wtxNew.nTime, ISMINE_SPENDABLE, setCoins, nValueIn))
                     return false;
                 CScript scriptChange;
                 BOOST_FOREACH(PAIRTYPE(const CWalletTx*, unsigned int) pcoin, setCoins)
@@ -1338,12 +1341,8 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int
     int64 nValueIn = 0;
 
     if (nBalance > nReserveBalance)
-    {
-        if (!SelectCoins(nBalance - nReserveBalance, txNew.nTime, setCoins, nValueIn))
-        {
+        if (!SelectCoins(nBalance - nReserveBalance, txNew.nTime, ISMINE_ALL_SCRIPT , setCoins, nValueIn))
             return false;
-        }
-    }
 
     if (nMintingOnlyBalance > 0)
     {

@@ -45,7 +45,8 @@ SOURCES_COMMON = \
   testnet.cpp \
   util.cpp \
   version.cpp \
-  walletdb.cpp
+  walletdb.cpp \
+  wallet_ismine.cpp
 
 SOURCES_HEADLESS = \
   $(SOURCES_COMMON) \

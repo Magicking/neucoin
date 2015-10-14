@@ -2792,7 +2792,7 @@ Value listunspent(const Array& params, bool fHelp)
 
     Array results;
     vector<COutput> vecOutputs;
-    pwalletMain->AvailableCoins((unsigned int)GetAdjustedTime(), vecOutputs, false);
+    pwalletMain->AvailableCoins((unsigned int)GetAdjustedTime(), ISMINE_SPENDABLE, vecOutputs, false);
     BOOST_FOREACH(const COutput& out, vecOutputs)
     {
         if (out.nDepth < nMinDepth || out.nDepth > nMaxDepth)

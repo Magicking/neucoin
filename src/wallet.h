@@ -10,6 +10,7 @@
 #include "key.h"
 #include "keystore.h"
 #include "script.h"
+#include "wallet_ismine.h"
 
 #include "IsValidAmount.h"
 
@@ -65,7 +66,7 @@ public:
 class CWallet : public CCryptoKeyStore
 {
 private:
-    bool SelectCoins(int64 nTargetValue, unsigned int nSpendTime, std::set<std::pair<const CWalletTx*,unsigned int> >& setCoinsRet, int64& nValueRet) const;
+    bool SelectCoins(int64 nTargetValue, unsigned int nSpendTime, isminefilter filter, std::set<std::pair<const CWalletTx*,unsigned int> >& setCoinsRet, int64& nValueRet) const;
     bool SelectMintingOnlyCoins(unsigned int nSpendTime, std::set<std::pair<const CWalletTx*, unsigned int> >& setCoinsRet, int64& nValueRet) const;
 
     CWalletDB *pwalletdbEncryption;
@@ -125,7 +126,7 @@ public:
     // check whether we are allowed to upgrade (or already support) to the named feature
     bool CanSupportFeature(enum WalletFeature wf) { return nWalletMaxVersion >= wf; }
 
-    void AvailableCoins(unsigned int nSpendTime, std::vector<COutput>& vCoins, bool fOnlyConfirmed=true, bool fMintingOnly=false) const;
+    void AvailableCoins(unsigned int nSpendTime, isminefilter filter, std::vector<COutput>& vCoins, bool fOnlyConfirmed=true, bool fMintingOnly=false) const;
     bool SelectCoinsMinConf(int64 nTargetValue, int nConfMine, int nConfTheirs, std::vector<COutput> vCoins, std::set<std::pair<const CWalletTx*,unsigned int> >& setCoinsRet, int64& nValueRet) const;
 
     // keystore implementation
@@ -180,9 +181,9 @@ public:
     int64 GetOldestKeyPoolTime();
     void GetAllReserveKeys(std::set<CKeyID>& setAddress);
 
-    bool IsMine(const CTxIn& txin) const;
+    isminetype IsMine(const CTxIn& txin) const;
     int64 GetDebit(const CTxIn& txin) const;
-    bool IsMine(const CTxOut& txout) const
+    isminetype IsMine(const CTxOut& txout) const
     {
         return ::IsMine(*this, txout.scriptPubKey);
     }
@@ -190,7 +191,7 @@ public:
     {
         if (!IsValidAmount(txout.nValue))
             throw std::runtime_error("CWallet::GetCredit() : value out of range");
-        return (IsMine(txout) ? txout.nValue : 0);
+        return ((IsMine(txout) & ISMINE_SPENDABLE) ? txout.nValue : 0);
     }
     bool IsChange(const CTxOut& txout) const;
     int64 GetChange(const CTxOut& txout) const
@@ -209,12 +210,15 @@ public:
             throw std::runtime_error("CWallet::GetMintingOnlyCredit(): value out of range");
         return (IsMineForMintingOnly(txout) ? txout.nValue : 0);
     }
-    bool IsMine(const CTransaction& tx) const
+    isminetype IsMine(const CTransaction& tx, isminefilter filter) const
     {
         BOOST_FOREACH(const CTxOut& txout, tx.vout)
-            if (IsMine(txout))
-                return true;
-        return false;
+        {
+            isminetype ret = IsMine(txout);
+            if (ret & filter)
+                return ret;
+        }
+        return ISMINE_NO;
     }
     bool IsMineForMintingOnly(const CTransaction& tx) const
     {

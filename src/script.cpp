@@ -1598,81 +1598,6 @@ bool IsStandard(const CScript& scriptPubKey, txnouttype& whichType)
     return whichType != TX_NONSTANDARD;
 }
 
-
-unsigned int HaveKeys(const vector<valtype>& pubkeys, const CKeyStore& keystore)
-{
-    unsigned int nResult = 0;
-    BOOST_FOREACH(const valtype& pubkey, pubkeys)
-    {
-        CKeyID keyID = CPubKey(pubkey).GetID();
-        if (keystore.HaveKey(keyID))
-            ++nResult;
-    }
-    return nResult;
-}
-
-
-class CKeyStoreIsMineVisitor : public boost::static_visitor<bool>
-{
-private:
-    const CKeyStore *keystore;
-public:
-    CKeyStoreIsMineVisitor(const CKeyStore *keystoreIn) : keystore(keystoreIn) { }
-    bool operator()(const CNoDestination &dest) const { return false; }
-    bool operator()(const CKeyID &keyID) const { return keystore->HaveKey(keyID); }
-    bool operator()(const CScriptID &scriptID) const { return keystore->HaveCScript(scriptID); }
-};
-
-bool IsMine(const CKeyStore &keystore, const CTxDestination &dest)
-{
-    return boost::apply_visitor(CKeyStoreIsMineVisitor(&keystore), dest);
-}
-
-bool IsMine(const CKeyStore &keystore, const CScript& scriptPubKey)
-{
-    vector<valtype> vSolutions;
-    txnouttype whichType;
-    if (!Solver(scriptPubKey, whichType, vSolutions))
-        return false;
-
-    CKeyID keyID;
-    switch (whichType)
-    {
-    case TX_NONSTANDARD:
-    case TX_NULL_DATA:
-        return false;
-    case TX_PUBKEY:
-        keyID = CPubKey(vSolutions[0]).GetID();
-        return keystore.HaveKey(keyID);
-    case TX_PUBKEYHASH:
-        keyID = CKeyID(uint160(vSolutions[0]));
-        return keystore.HaveKey(keyID);
-    case TX_SCRIPTHASH:
-    {
-        CScript subscript;
-        if (!keystore.GetCScript(CScriptID(uint160(vSolutions[0])), subscript))
-            return false;
-        return IsMine(keystore, subscript);
-    }
-    case TX_MULTISIG:
-    {
-        // Only consider transactions "mine" if we own ALL the
-        // keys involved. multi-signature transactions that are
-        // partially owned (somebody else has a key that can spend
-        // them) enable spend-out-from-under-you attacks, especially
-        // in shared-wallet situations.
-        vector<valtype> keys(vSolutions.begin()+1, vSolutions.begin()+vSolutions.size()-1);
-        return HaveKeys(keys, keystore) == keys.size();
-    }
-    case TX_COLDMINTING:
-    {
-        CKeyID spendingKeyID = CKeyID(uint160(vSolutions[1]));
-        return keystore.HaveKey(spendingKeyID);
-    }
-    }
-    return false;
-}
-
 bool IsMineForMintingOnly(const CKeyStore & keystore, const CScript& scriptPubKey)
 {
     std::vector<valtype> vSolutions;
@@ -1696,7 +1621,7 @@ bool IsMineForMintingOnly(const CKeyStore & keystore, const CScript& scriptPubKe
     {
         CKeyID mintingKeyID = CKeyID(uint160(vSolutions[0]));
         CKeyID spendingKeyID = CKeyID(uint160(vSolutions[1]));
-
+printf("IsMineForMintingOnly: %d %d\n", keystore.HaveKey(mintingKeyID), keystore.HaveKey(spendingKeyID));
         return keystore.HaveKey(mintingKeyID) && !keystore.HaveKey(spendingKeyID);
     }
     default:
