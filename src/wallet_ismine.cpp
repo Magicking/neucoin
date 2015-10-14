@@ -80,8 +80,8 @@ isminetype IsMine(const CKeyStore &keystore, const CScript& scriptPubKey)
     vector<valtype> vSolutions;
     txnouttype whichType;
     if (!Solver(scriptPubKey, whichType, vSolutions)) {
-//        if (keystore.HaveWatchOnly(scriptPubKey))
-//            return ISMINE_WATCH_UNSOLVABLE;
+        if (keystore.HaveWatchOnly(scriptPubKey.GetID()))
+            return ISMINE_WATCH_ONLY;
         return ISMINE_NO;
     }
 
@@ -134,14 +134,9 @@ isminetype IsMine(const CKeyStore &keystore, const CScript& scriptPubKey)
         else
             if (keystore.HaveKey(spendingKeyID))
                 return ISMINE_SPENDABLE;
-        return ISMINE_NO;
+        break;
     }
     }
 
-/*    if (keystore.HaveWatchOnly(scriptPubKey)) {
-        // TODO: This could be optimized some by doing some work after the above solver
-        CScript scriptSig;
-        return ProduceSignature(DummySignatureCreator(&keystore), scriptPubKey, scriptSig) ? ISMINE_WATCH_SOLVABLE : ISMINE_WATCH_UNSOLVABLE;
-    }*/
-    return ISMINE_NO;
+    return keystore.HaveWatchOnly(scriptPubKey.GetID()) ? ISMINE_WATCH_ONLY : ISMINE_NO;
 }
