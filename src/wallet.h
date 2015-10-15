@@ -167,9 +167,7 @@ public:
     int64 GetBalance() const;
     int64 GetMintingOnlyBalance() const;
     int64 GetUnconfirmedBalance() const;
-    int64 GetWatchOnlyBalance() const;
     int64 GetMintingOnlyWatchOnlyBalance() const;
-    int64 GetUnconfirmedWatchOnlyBalance() const;
     int64 GetStake() const;
     int64 GetNewMint() const;
     bool CreateTransaction(const std::vector<std::pair<CScript, int64> >& vecSend, CWalletTx& wtxNew, CReserveKey& reservekey, int64& nFeeRet);
@@ -190,7 +188,7 @@ public:
     void GetAllReserveKeys(std::set<CKeyID>& setAddress);
 
     isminetype IsMine(const CTxIn& txin) const;
-    int64 GetDebit(const CTxIn& txin, isminefilter filter=(ISMINE_SPENDABLE|ISMINE_WATCH_ONLY)) const;
+    int64 GetDebit(const CTxIn& txin, isminefilter filter = ISMINE_SPENDABLE) const;
     isminetype IsMine(const CTxOut& txout) const
     {
         return ::IsMine(*this, txout.scriptPubKey);
@@ -700,9 +698,9 @@ public:
     void GetAccountAmounts(const std::string& strAccount, int64& nGenerated, int64& nReceived,
                            int64& nSent, int64& nFee, isminefilter filter=(ISMINE_SPENDABLE|ISMINE_WATCH_ONLY)) const;
 
-    bool IsFromMe() const
+    bool IsFromMe(isminefilter filter = ISMINE_SPENDABLE) const
     {
-        return (GetDebit() > 0);
+        return (GetDebit(filter) > 0);
     }
 
     bool IsConfirmed() const
@@ -771,10 +769,11 @@ public:
     const CWalletTx *tx;
     int i;
     int nDepth;
+    bool fSpendable;
 
-    COutput(const CWalletTx *txIn, int iIn, int nDepthIn)
+    COutput(const CWalletTx *txIn, int iIn, int nDepthIn, bool fSpendableIn)
     {
-        tx = txIn; i = iIn; nDepth = nDepthIn;
+        tx = txIn; i = iIn; nDepth = nDepthIn; fSpendable = fSpendableIn;
     }
 
     std::string ToString() const

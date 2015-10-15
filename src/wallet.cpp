@@ -509,7 +509,7 @@ bool CWallet::IsChange(const CTxOut& txout) const
     // a better way of identifying which outputs are 'the send' and which are
     // 'the change' will need to be implemented (maybe extend CWalletTx to remember
     // which output, if any, was change).
-    if (ExtractDestination(txout.scriptPubKey, address) && (::IsMine(*this, txout.scriptPubKey) & ISMINE_SPENDABLE))
+    if (::IsMine(*this, txout.scriptPubKey) & ISMINE_SPENDABLE)
     {
         LOCK(cs_wallet);
         if (!mapAddressBook.count(address))
@@ -1010,7 +1010,8 @@ void CWallet::AvailableCoins(unsigned int nSpendTime, isminefilter filter, vecto
                 if (pcoin->vout[i].nValue <= 0)
                     continue ;
 
-                vCoins.push_back(COutput(pcoin, i, pcoin->GetDepthInMainChain()));
+                vCoins.push_back(COutput(pcoin, i, pcoin->GetDepthInMainChain(),
+                                 IsMine(pcoin->vout[i]) & filter));
             }
         }
     }
