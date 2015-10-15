@@ -207,14 +207,14 @@ int CWalletDB::LoadWallet(CWallet* pwallet)
                 if (nNumber > nAccountingEntryNumber)
                     nAccountingEntryNumber = nNumber;
             }
-            else if (strType == "watch")
+            else if (strType == "watchs")
             {
-                std::string strAddress;
-                ssKey >> strAddress;
+                CScript script;
+                ssKey >> script;
                 char fYes;
                 ssValue >> fYes;
                 if (fYes == '1')
-                    pwallet->LoadWatchOnly(CBitcoinAddress(strAddress).Get());
+                    pwallet->LoadWatchOnly(script);
             }
             else if (strType == "key" || strType == "wkey")
             {

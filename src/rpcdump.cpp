@@ -90,11 +90,18 @@ Value importaddress(const Array& params, bool fHelp)
             "importaddress <address> [label] [rescan=true]\n"
             "Adds an address that can be watched as if it were in your wallet but cannot be used to spend.");
 
+    CScript script;
+
     CBitcoinAddress address(params[0].get_str());
-    if (!address.IsValid())
-        throw JSONRPCError(-5, "Invalid Bitcoin address");
-    CTxDestination dest;
-    dest = address.Get();
+    if (address.IsValid())
+    {
+        script.SetDestination(address.Get());
+    } else if (IsHex(params[0].get_str())) {
+        std::vector<unsigned char> data(ParseHex(params[0].get_str()));
+        script = CScript(data.begin(), data.end());
+    } else {
+        throw JSONRPCError(-5, "Invalid Bitcoin address or script");
+    }
 
     string strLabel = "";
     if (params.size() > 1)
@@ -109,13 +116,13 @@ Value importaddress(const Array& params, bool fHelp)
         LOCK2(cs_main, pwalletMain->cs_wallet);
 
         // Don't throw error in case an address is already there
-        if (pwalletMain->HaveWatchOnly(dest))
+        if (pwalletMain->HaveWatchOnly(script))
             return Value::null;
 
         pwalletMain->MarkDirty();
-        pwalletMain->SetAddressBookName(dest, strLabel);
+        pwalletMain->SetAddressBookName(address.Get(), strLabel);
 
-        if (!pwalletMain->AddWatchOnly(dest))
+        if (!pwalletMain->AddWatchOnly(script))
             throw JSONRPCError(-4, "Error adding address to wallet");
 
         if (fRescan)
@@ -123,6 +130,8 @@ Value importaddress(const Array& params, bool fHelp)
             pwalletMain->ScanForWalletTransactions(pindexGenesisBlock, true);
             pwalletMain->ReacceptWalletTransactions();
         }
+        if (!pwalletMain->HaveWatchOnly(script))
+            throw JSONRPCError(-4, "Error adding address to wallet");
     }
 
     return Value::null;

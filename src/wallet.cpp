@@ -17,6 +17,7 @@
 #include "base58.h"
 #include "constants.h"
 #include "macros.h"
+#include "script.h"
 
 #include "GetNextTargetRequired.h"
 #include "GetProofOfWorkReward.h"
@@ -82,7 +83,7 @@ bool CWallet::AddCScript(const CScript& redeemScript)
     return CWalletDB(strWalletFile).WriteCScript(Hash160(redeemScript), redeemScript);
 }
 
-bool CWallet::AddWatchOnly(const CTxDestination &dest)
+bool CWallet::AddWatchOnly(const CScript &dest)
 {
     if (!CCryptoKeyStore::AddWatchOnly(dest))
         return false;
@@ -91,9 +92,8 @@ bool CWallet::AddWatchOnly(const CTxDestination &dest)
     return CWalletDB(strWalletFile).WriteWatchOnly(dest);
 }
 
-bool CWallet::LoadWatchOnly(const CTxDestination &dest)
+bool CWallet::LoadWatchOnly(const CScript &dest)
 {
-    printf("Loaded %s!\n", CBitcoinAddress(dest).ToString().c_str());
     return CCryptoKeyStore::AddWatchOnly(dest);
 }
 
@@ -425,7 +425,6 @@ bool CWallet::AddToWallet(const CWalletTx& wtxIn)
     MainFrameRepaint();
     return true;
 }
-
 // Add a transaction to the wallet, or update it.
 // pblock is optional, but should be provided if the transaction is known to be in a block.
 // If fUpdate is true, existing transactions will be updated.
@@ -483,7 +482,7 @@ isminetype CWallet::IsMine(const CTxIn &txin) const
     return ISMINE_NO;
 }
 
-int64 CWallet::GetDebit(const CTxIn &txin) const
+int64 CWallet::GetDebit(const CTxIn &txin, isminefilter filter) const
 {
     {
         LOCK(cs_wallet);
@@ -492,7 +491,7 @@ int64 CWallet::GetDebit(const CTxIn &txin) const
         {
             const CWalletTx& prev = (*mi).second;
             if (txin.prevout.n < prev.vout.size())
-                if (IsMine(prev.vout[txin.prevout.n]) & ISMINE_SPENDABLE)
+                if (IsMine(prev.vout[txin.prevout.n]) & filter)
                     return prev.vout[txin.prevout.n].nValue;
         }
     }
@@ -563,8 +562,12 @@ int CWalletTx::GetRequestCount() const
     return nRequests;
 }
 
-void CWalletTx::GetAmounts(int64& nGeneratedImmature, int64& nGeneratedMature, list<pair<CTxDestination, int64> >& listReceived,
-                           list<pair<CTxDestination, int64> >& listSent, int64& nFee, string& strSentAccount) const
+void CWalletTx::GetAmounts(int64& nGeneratedImmature,
+                           int64& nGeneratedMature,
+                           list<pair<CTxDestination, int64> >& listReceived,
+                           list<pair<CTxDestination, int64> >& listSent,
+                           int64& nFee, string& strSentAccount,
+                           isminefilter filter) const
 {
     nGeneratedImmature = nGeneratedMature = nFee = 0;
     listReceived.clear();
@@ -574,14 +577,14 @@ void CWalletTx::GetAmounts(int64& nGeneratedImmature, int64& nGeneratedMature, l
     if (IsCoinBase() || IsCoinStake())
     {
         if (GetBlocksToMaturity() > 0)
-            nGeneratedImmature = pwallet->GetCredit(*this) - pwallet->GetDebit(*this);
+            nGeneratedImmature = pwallet->GetCredit(*this, filter) - pwallet->GetDebit(*this, filter);
         else
-            nGeneratedMature = GetCredit() - GetDebit();
+            nGeneratedMature = GetCredit(filter) - GetDebit(filter);
         return;
     }
 
     // Compute fee:
-    int64 nDebit = GetDebit();
+    int64 nDebit = GetDebit(filter);
     if (nDebit > 0) // debit>0 means we signed/sent this transaction
     {
         int64 nValueOut = GetValueOut();
@@ -597,6 +600,7 @@ void CWalletTx::GetAmounts(int64& nGeneratedImmature, int64& nGeneratedMature, l
         {
             printf("CWalletTx::GetAmounts: Unknown transaction type found, txid %s\n",
                    this->GetHash().ToString().c_str());
+            address = CNoDestination();
         }
 
         // Don't report 'change' txouts
@@ -606,14 +610,14 @@ void CWalletTx::GetAmounts(int64& nGeneratedImmature, int64& nGeneratedMature, l
         if (nDebit > 0)
             listSent.push_back(make_pair(address, txout.nValue));
 
-        if (pwallet->IsMine(txout) & ISMINE_SPENDABLE)
+        if (pwallet->IsMine(txout) & filter)
             listReceived.push_back(make_pair(address, txout.nValue));
     }
 
 }
 
 void CWalletTx::GetAccountAmounts(const string& strAccount, int64& nGenerated, int64& nReceived,
-                                  int64& nSent, int64& nFee) const
+                                  int64& nSent, int64& nFee, isminefilter filter) const
 {
     nGenerated = nReceived = nSent = nFee = 0;
 

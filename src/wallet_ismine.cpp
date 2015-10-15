@@ -80,7 +80,7 @@ isminetype IsMine(const CKeyStore &keystore, const CScript& scriptPubKey)
     vector<valtype> vSolutions;
     txnouttype whichType;
     if (!Solver(scriptPubKey, whichType, vSolutions)) {
-        if (keystore.HaveWatchOnly(scriptPubKey.GetID()))
+        if (keystore.HaveWatchOnly(scriptPubKey))
             return ISMINE_WATCH_ONLY;
         return ISMINE_NO;
     }
@@ -138,5 +138,5 @@ isminetype IsMine(const CKeyStore &keystore, const CScript& scriptPubKey)
     }
     }
 
-    return keystore.HaveWatchOnly(scriptPubKey.GetID()) ? ISMINE_WATCH_ONLY : ISMINE_NO;
+    return keystore.HaveWatchOnly(scriptPubKey) ? ISMINE_WATCH_ONLY : ISMINE_NO;
 }
