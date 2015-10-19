@@ -1426,7 +1426,7 @@ Value ListReceived(const Array& params, bool fByAccounts)
 
     isminefilter filter = ISMINE_SPENDABLE;
 
-    if (params[2].get_bool())
+    if (params.size() > 2 && params[2].get_bool())
         filter |= ISMINE_WATCH_ONLY;
 
     // Tally
@@ -1742,20 +1742,20 @@ Value listaccounts(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() > 2)
         throw runtime_error(
-            "listaccounts [minconf=1]\n"
+            "listaccounts [minconf=1] [includeWatchonly=false]\n"
             "Returns an object that contains an entry for each account, using the the account name as key, and the account balance as value.\n"
             "If [includeWatchonly] is specified, include balance in watchonly addresses (see 'importaddress')\n");
 
     int nMinDepth = 1;
     if (params.size() > 0)
         nMinDepth = params[0].get_int();
-    isminefilter includeWatchonly = ISMINE_SPENDABLE;
+    isminefilter filter = ISMINE_SPENDABLE;
     if (params.size() > 1 && params[1].get_bool())
-        includeWatchonly |= ISMINE_WATCH_ONLY;
+        filter |= ISMINE_WATCH_ONLY;
 
     map<string, int64> mapAccountBalances;
     BOOST_FOREACH(const PAIRTYPE(CTxDestination, string)& entry, pwalletMain->mapAddressBook) {
-        if (IsMine(*pwalletMain, entry.first) & includeWatchonly) // This address belongs to me
+        if (IsMine(*pwalletMain, entry.first) & filter) // This address belongs to me
             mapAccountBalances[entry.second] = 0;
     }
 
@@ -1766,7 +1766,7 @@ Value listaccounts(const Array& params, bool fHelp)
         string strSentAccount;
         list<pair<CTxDestination, int64> > listReceived;
         list<pair<CTxDestination, int64> > listSent;
-        wtx.GetAmounts(nGeneratedImmature, nGeneratedMature, listReceived, listSent, nFee, strSentAccount, includeWatchonly);
+        wtx.GetAmounts(nGeneratedImmature, nGeneratedMature, listReceived, listSent, nFee, strSentAccount, filter);
         mapAccountBalances[strSentAccount] -= nFee;
         BOOST_FOREACH(const PAIRTYPE(CTxDestination, int64)& s, listSent)
             mapAccountBalances[strSentAccount] -= s.second;
@@ -1873,7 +1873,7 @@ Value gettransaction(const Array& params, bool fHelp)
     hash.SetHex(params[0].get_str());
 
     isminefilter filter = ISMINE_SPENDABLE;
-    if (params[1].get_bool())
+    if (params.size() > 1 && params[1].get_bool())
         filter |= ISMINE_WATCH_ONLY;
 
     Object entry;
@@ -4099,7 +4099,7 @@ Array RPCConvertValues(const std::string &strMethod, const std::vector<std::stri
     if (strMethod == "sendtoaddress"          && n > 1) ConvertTo<double>(params[1]);
     if (strMethod == "settxfee"               && n > 0) ConvertTo<double>(params[0]);
     if (strMethod == "getreceivedbyaddress"   && n > 1) ConvertTo<boost::int64_t>(params[1]);
-    if (strMethod == "getreceivedbyaccount"   && n > 1) ConvertTo<boost::int64_t>(params[1]);
+    if (strMethod == "gettransaction"         && n > 1) ConvertTo<bool>(params[1]);
     if (strMethod == "listreceivedbyaddress"  && n > 0) ConvertTo<boost::int64_t>(params[0]);
     if (strMethod == "listreceivedbyaddress"  && n > 1) ConvertTo<bool>(params[1]);
     if (strMethod == "listreceivedbyaddress"  && n > 2) ConvertTo<bool>(params[2]);
@@ -4117,7 +4117,9 @@ Array RPCConvertValues(const std::string &strMethod, const std::vector<std::stri
     if (strMethod == "sendfrom"               && n > 3) ConvertTo<boost::int64_t>(params[3]);
     if (strMethod == "listtransactions"       && n > 1) ConvertTo<boost::int64_t>(params[1]);
     if (strMethod == "listtransactions"       && n > 2) ConvertTo<boost::int64_t>(params[2]);
+    if (strMethod == "listtransactions"       && n > 3) ConvertTo<bool>(params[3]);
     if (strMethod == "listaccounts"           && n > 0) ConvertTo<boost::int64_t>(params[0]);
+    if (strMethod == "listaccounts"           && n > 1) ConvertTo<bool>(params[1]);
     if (strMethod == "walletpassphrase"       && n > 1) ConvertTo<boost::int64_t>(params[1]);
     if (strMethod == "walletpassphrase"       && n > 2) ConvertTo<bool>(params[2]);
     if (strMethod == "getblocktemplate"       && n > 0) ConvertTo<Object>(params[0]);
