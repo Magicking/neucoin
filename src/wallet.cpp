@@ -1011,7 +1011,7 @@ void CWallet::AvailableCoins(unsigned int nSpendTime, isminefilter filter, vecto
                     continue ;
 
                 vCoins.push_back(COutput(pcoin, i, pcoin->GetDepthInMainChain(),
-                                 IsMine(pcoin->vout[i]) & filter));
+                                 IsMine(pcoin->vout[i]) & ISMINE_SPENDABLE));
             }
         }
     }
