@@ -68,6 +68,9 @@ int64 nHPSTimerStart;
 
 // Settings
 int64 nTransactionFee = MIN_TX_FEES;
+#ifdef TESTING
+bool fIgnoreConnection = false;
+#endif
 
 //////////////////////////////////////////////////////////////////////////////
 //

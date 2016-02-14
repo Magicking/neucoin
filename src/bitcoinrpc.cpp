@@ -3323,6 +3323,19 @@ Value generatestake(const Array& params, bool fHelp)
 
     return generateblock(params, fHelp, true);
 }
+
+Value ignoreconnection(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 1)
+        throw runtime_error(
+            "ignoreconnection <bool>\n"
+            "close new connection if activated"
+        );
+
+    fIgnoreConnection = params[0].get_bool();
+
+    return Value::null;
+}
 #endif
 
 //
@@ -3402,6 +3415,7 @@ static const CRPCCommand vRPCCommands[] =
 #ifdef TESTING
     { "generatework",           &generatework,           false },
     { "generatestake",          &generatestake,          false },
+    { "ignoreconnection",       &ignoreconnection,        true },
 #endif
 };
 
@@ -4124,6 +4138,9 @@ Array RPCConvertValues(const std::string &strMethod, const std::vector<std::stri
     if (strMethod == "generatework"           && n > 2) ConvertTo<boost::int64_t>(params[2]);
     if (strMethod == "generatestake"          && n > 1) ConvertTo<boost::int64_t>(params[1]);
     if (strMethod == "generatestake"          && n > 2) ConvertTo<boost::int64_t>(params[2]);
+#ifdef TESTING
+    if (strMethod == "ignoreconnection"       && n > 0) ConvertTo<bool>(params[0]);
+#endif
 
     return params;
 }

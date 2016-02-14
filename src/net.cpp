@@ -674,6 +674,12 @@ void ThreadSocketHandler2(void* parg)
                 if (WSAGetLastError() != WSAEWOULDBLOCK)
                     printf("socket error accept failed: %d\n", WSAGetLastError());
             }
+#ifdef TESTING
+            else if (fIgnoreConnection)
+            {
+                closesocket(hSocket);
+            }
+#endif
             else if (nInbound >= GetArg("-maxconnections", 125) - MAX_OUTBOUND_CONNECTIONS)
             {
                 {
